@@ -35,3 +35,7 @@
 - **What the AI generated:** Reviewed the existing suite against the assessment checklist and added only the missing tests: the PostgreSQL negative-stock constraint, anonymous dashboard access redirecting to login, and soft-deleted products being rejected by the POS add endpoint.
 - **What to verify:** Run the full suite and confirm the three new tests pass without changing any existing test; confirm the earlier tests already cover duplicate-SKU case handling, service-level negative stock, checkout rollback consistency, product search, and the other login checks.
 
+## Step 13: Prepare for production deployment on Render with Neon PostgreSQL
+
+- **What the AI generated:** Added `gunicorn` and `whitenoise` dependencies; updated `config/settings.py` with WhiteNoise middleware, `STATIC_ROOT`, Django 6 `STORAGES` (default FileSystemStorage and staticfiles CompressedManifestStaticFilesStorage), `RENDER_EXTERNAL_HOSTNAME` handling for `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`, and production-only security settings when `DEBUG` is False; expanded `.env.example` with deployment/demo variables; added executable `build.sh` (`uv sync --frozen --no-dev`, `collectstatic`, `migrate`, `seed`) with a marked TODO for uv installation.
+- **What to verify:** With `DEBUG=True`, local HTTP still works; with `DEBUG=False` and required env vars, `manage.py check --deploy` reflects only intentional remaining warnings; `collectstatic --noinput --dry-run` succeeds; confirm Render env vars/hostname and review the `build.sh` uv-install TODO before deployment.
