@@ -168,3 +168,11 @@ class DashboardViewTests(TestCase):
         self.assertContains(
             response, reverse("sales:sale_detail", args=[sale.pk])
         )
+
+    def test_dashboard_requires_login(self):
+        response = self.client.get(reverse("dashboard:home"))
+
+        self.assertRedirects(
+            response,
+            f"{reverse('login')}?next={reverse('dashboard:home')}",
+        )

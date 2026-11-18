@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -247,6 +248,13 @@ class StockServiceTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 10)
         self.assertFalse(self.product.adjustments.exists())
+
+    def test_database_constraint_rejects_negative_stock(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Product.objects.filter(pk=self.product.pk).update(stock_quantity=-1)
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 10)
 
 
 class StockAdjustmentViewTests(TestCase):

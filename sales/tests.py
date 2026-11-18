@@ -374,6 +374,14 @@ class PosViewTests(TestCase):
         self.assertContains(response, "out of stock")
         self.assertEqual(self.get_cart(), {})
 
+    def test_soft_deleted_product_cannot_be_added_to_cart(self):
+        response = self.client.post(
+            reverse("sales:pos_add", args=[self.inactive.pk]), follow=True
+        )
+
+        self.assertContains(response, "not available for sale")
+        self.assertEqual(self.get_cart(), {})
+
     def test_add_respects_available_stock(self):
         self.set_cart({self.chips.pk: 2})
 

@@ -30,3 +30,8 @@
 - **What the AI generated:** `dashboard/services.py` with database-aggregated today's sales (local `Asia/Kolkata` day boundary), active product count, low-stock query (`active`, stock < 5, ascending) and five most recent sales; a thin dashboard view; Bootstrap cards plus low-stock and recent-sales tables with links; service and view tests.
 - **What to verify:** Today's total and transaction count ignore yesterday's sales and show `0.00` when there are none; a product with stock exactly 5 is not listed as low stock while stock 4 and 0 are; inactive products are excluded; low-stock and invoice links open the right pages.
 
+## Step: Assessment checklist test review
+
+- **What the AI generated:** Reviewed the existing suite against the assessment checklist and added only the missing tests: the PostgreSQL negative-stock constraint, anonymous dashboard access redirecting to login, and soft-deleted products being rejected by the POS add endpoint.
+- **What to verify:** Run the full suite and confirm the three new tests pass without changing any existing test; confirm the earlier tests already cover duplicate-SKU case handling, service-level negative stock, checkout rollback consistency, product search, and the other login checks.
+
