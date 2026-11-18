@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Deactivate {{ product.name }} | MiniPOS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card border-danger">
+      <div class="card-body">
+        <h1 class="h4">Deactivate product</h1>
+        <p>
+          Deactivate <strong>{{ product.name }}</strong> ({{ product.sku }})?
+        </p>
+        <p class="text-muted mb-4">
+          The product will be hidden from the default product list but will not be deleted.
+          Past sales keep their own product snapshots.
+        </p>
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          <button class="btn btn-danger" type="submit">Deactivate product</button>
+          <a class="btn btn-outline-secondary" href="{% url 'products:list' %}">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

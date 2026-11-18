@@ -18,7 +18,8 @@
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link" href="{% url 'dashboard:home' %}">Dashboard</a></li>
-        {# Products, POS and Sales links get added in later steps #}
+        <li class="nav-item"><a class="nav-link" href="{% url 'products:list' %}">Products</a></li>
+        {# POS and Sales links get added in later steps #}
       </ul>
       <form method="post" action="{% url 'logout' %}" class="d-flex align-items-center gap-2">
         {% csrf_token %}

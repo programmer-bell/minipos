@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{% if product %}Edit product{% else %}New product{% endif %} | MiniPOS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h3 mb-0">{% if product %}Edit product{% else %}New product{% endif %}</h1>
+      <a class="btn btn-outline-secondary" href="{% url 'products:list' %}">Back to products</a>
+    </div>
+
+    <form method="post" class="card card-body">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+
+      {% if product %}
+        <div class="mb-3">
+          <label class="form-label" for="current_stock">Stock quantity</label>
+          <input type="text" class="form-control" id="current_stock" value="{{ product.stock_quantity }}" disabled>
+          <div class="form-text">Stock is not editable here. Use a stock adjustment to change it (built in the next step).</div>
+        </div>
+      {% endif %}
+
+      <p class="small text-muted">Missing a category? <a href="{% url 'products:category_create' %}">Create one</a>.</p>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">{% if product %}Save changes{% else %}Create product{% endif %}</button>
+        <a class="btn btn-outline-secondary" href="{% url 'products:list' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
