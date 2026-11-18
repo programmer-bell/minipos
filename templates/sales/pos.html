@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}POS | MiniPOS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">Point of sale</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'products:list' %}">Products</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5">Find a product</h2>
+        <form method="get" class="row g-2">
+          <div class="col">
+            <label for="q" class="visually-hidden">Search</label>
+            <input type="search" class="form-control" id="q" name="q" value="{{ query }}" placeholder="Name, SKU or barcode" autofocus>
+          </div>
+          <div class="col-auto">
+            <button class="btn btn-outline-primary" type="submit">Search</button>
+          </div>
+        </form>
+        <div class="form-text">Matches product names, SKUs, or an exact barcode.</div>
+      </div>
+    </div>
+
+    {% if query %}
+      <div class="card">
+        <div class="card-body">
+          <h2 class="h5">Results</h2>
+          {% for result in search_results %}
+            <div class="border rounded p-2 mb-2">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div class="fw-semibold">{{ result.product.name }}</div>
+                  <div class="small text-muted">
+                    <code>{{ result.product.sku }}</code> &middot; {{ result.product.price }}
+                  </div>
+                </div>
+                <div class="text-end">
+                  <div class="small mb-1">
+                    Stock: {{ result.product.stock_quantity }}
+                    {% if result.in_cart %}&middot; In cart: {{ result.in_cart }}{% endif %}
+                  </div>
+                  <form method="post" action="{% url 'sales:pos_add' result.product.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="q" value="{{ query }}">
+                    <button class="btn btn-sm btn-primary" type="submit"
+                      {% if result.product.stock_quantity == 0 or result.in_cart >= result.product.stock_quantity %}disabled{% endif %}>
+                      Add
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-muted mb-0">No active products match "{{ query }}".</p>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5">Cart</h2>
+        {% if rows %}
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th class="text-end">Price</th>
+                  <th style="width: 10rem;">Qty</th>
+                  <th class="text-end">Line total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                  <tr>
+                    <td>
+                      {{ row.product.name }}
+                      {% if not row.product.is_active %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+                      <div class="small text-muted">
+                        <code>{{ row.product.sku }}</code> &middot; stock {{ row.product.stock_quantity }}
+                      </div>
+                    </td>
+                    <td class="text-end">{{ row.product.price }}</td>
+                    <td>
+                      <form method="post" action="{% url 'sales:pos_update' row.product.pk %}" class="d-flex gap-1">
+                        {% csrf_token %}
+                        <input type="hidden" name="q" value="{{ query }}">
+                        <input type="number" class="form-control form-control-sm" name="quantity" value="{{ row.quantity }}" min="1" max="{{ row.product.stock_quantity }}" required>
+                        <button class="btn btn-sm btn-outline-secondary" type="submit">Update</button>
+                      </form>
+                    </td>
+                    <td class="text-end">{{ row.line_total }}</td>
+                    <td class="text-end">
+                      <form method="post" action="{% url 'sales:pos_remove' row.product.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="q" value="{{ query }}">
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">The cart is empty. Search for a product and click Add.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <dl class="row mb-3">
+          <dt class="col-7">Subtotal</dt>
+          <dd class="col-5 text-end">{{ subtotal }}</dd>
+          <dt class="col-7">Discount</dt>
+          <dd class="col-5 text-end">{{ discount_amount }}</dd>
+          <dt class="col-7 fs-5">Total</dt>
+          <dd class="col-5 text-end fs-5 fw-bold">{{ total }}</dd>
+        </dl>
+
+        {% if discount_error %}
+          <div class="alert alert-warning py-2">{{ discount_error }}</div>
+        {% endif %}
+
+        <form method="post" action="{% url 'sales:pos_discount' %}">
+          {% csrf_token %}
+          <input type="hidden" name="q" value="{{ query }}">
+          <div class="row g-2 align-items-end">
+            <div class="col-sm-6">
+              <label for="{{ discount_form.discount_type.id_for_label }}" class="form-label">{{ discount_form.discount_type.label }}</label>
+              {{ discount_form.discount_type }}
+            </div>
+            <div class="col-sm-4">
+              <label for="{{ discount_form.discount_value.id_for_label }}" class="form-label">Value</label>
+              {{ discount_form.discount_value }}
+            </div>
+            <div class="col-sm-2 d-grid">
+              <button class="btn btn-outline-secondary" type="submit">Apply</button>
+            </div>
+          </div>
+          <div class="d-grid mt-3">
+            <button class="btn btn-success btn-lg" type="submit" formaction="{% url 'sales:pos_checkout' %}" {% if not rows %}disabled{% endif %}>
+              Complete sale
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

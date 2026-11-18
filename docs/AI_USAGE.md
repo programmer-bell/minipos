@@ -15,3 +15,8 @@
 - **What the AI generated:** `sales/services.py` with `CheckoutError`, `calculate_discount()` (flat/percent validation, ROUND_HALF_UP, capped at subtotal) and an atomic `checkout()` that merges duplicate items, locks products in id order, validates active state and stock, uses database prices, writes invoice `INV-YYYYMMDD-<pk>`, creates snapshot `SaleItem` rows and reduces stock through `products.services.adjust_stock()`; tests for successful sales, insufficient stock and rollback, discounts, price snapshots and inactive products.
 - **What to verify:** Complete a sale and confirm stock, invoice number, totals and SALE history rows; try an oversold two-item cart and confirm nothing changed; check 7.5% of 99.99 gives 7.50; change a product price after a sale and confirm the old invoice is unchanged; inactive products are rejected.
 
+## Step: POS screen (`sales` app)
+
+- **What the AI generated:** `/pos/` with session cart (`{product_id: quantity}` only), active-product search by name/SKU/exact barcode limited to 10 results, add/update/remove cart actions, server-rendered discount preview, `DiscountForm`, checkout through `sales.services.checkout()`, a minimal sale detail page, POS navbar link, Bootstrap error alert styling, and view tests.
+- **What to verify:** Add products and update quantities; try a quantity above stock and confirm it is blocked with a message; apply 10% and a flat discount and check the totals; complete a sale and confirm the cart clears, the invoice page opens, and stock drops; open POS in two tabs, sell the last unit in one, and confirm the other fails with a clear message instead of overselling.
+
