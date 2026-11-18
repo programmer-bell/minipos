@@ -5,7 +5,7 @@
 MiniPOS is a small, server-rendered point-of-sale application built for the MiniPOS Retail technical assessment. It supports product and inventory management, checkout with discounts, sales history, printable invoices, and a daily dashboard.
 
 - **Repository:** https://github.com/programmer-bell/minipos
-- **Live application:** `https://minipos-zy0x.onrender.com`
+- **Live application:** https://minipos-zy0x.onrender.com
 
 ## Features
 
