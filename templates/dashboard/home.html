@@ -4,5 +4,104 @@
 
 {% block content %}
 <h1 class="h3">Dashboard</h1>
-<p class="text-muted">Welcome, {{ user.username }}. Stats will appear here in a later step.</p>
+<p class="text-muted">Welcome, {{ user.username }}.</p>
+
+<div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
+  <div class="col">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small">Today's sales</div>
+        <div class="fs-3 fw-bold">{{ today_sales_total }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small">Transactions today</div>
+        <div class="fs-3 fw-bold">{{ today_sales_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small">Active products</div>
+        <div class="fs-3 fw-bold">{{ active_product_count }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0">Low stock</h2>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'products:list' %}">All products</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>SKU</th>
+                <th class="text-end">Stock</th>
+                <th class="text-end"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for product in low_stock_products %}
+                <tr>
+                  <td>{{ product.name }}</td>
+                  <td><code>{{ product.sku }}</code></td>
+                  <td class="text-end">{{ product.stock_quantity }}</td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'products:stock' product.pk %}">Stock</a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">No low-stock products.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0">Recent sales</h2>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'sales:sale_list' %}">All sales</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Date</th>
+                <th class="text-end">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sale in recent_sales %}
+                <tr>
+                  <td><a href="{% url 'sales:sale_detail' sale.pk %}">{{ sale.invoice_number }}</a></td>
+                  <td>{{ sale.created_at|date:"M j, H:i" }}</td>
+                  <td class="text-end">{{ sale.total }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-center text-muted py-3">No sales yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

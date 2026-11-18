@@ -25,3 +25,8 @@
 - **What the AI generated:** `/sales/` with paginated newest-first sales, invoice search, inclusive date-range filter and item counts; upgraded `/sales/<id>/` using `SaleItem` snapshots with the full discount breakdown; `/sales/<id>/print/` standalone print template with `@media print` and `window.print()`; Sales navbar link; `SaleFilterForm`; query optimization with `select_related`/`prefetch_related`; tests for ordering, filters, snapshots, print output and login protection.
 - **What to verify:** Totals on the list/detail/print pages match the POS receipt; change a product's name, SKU or price after a sale and confirm the old invoice is unchanged; search by invoice and filter by a date range; print preview has no navbar and hides the Print button.
 
+## Step: Real dashboard (`dashboard` app)
+
+- **What the AI generated:** `dashboard/services.py` with database-aggregated today's sales (local `Asia/Kolkata` day boundary), active product count, low-stock query (`active`, stock < 5, ascending) and five most recent sales; a thin dashboard view; Bootstrap cards plus low-stock and recent-sales tables with links; service and view tests.
+- **What to verify:** Today's total and transaction count ignore yesterday's sales and show `0.00` when there are none; a product with stock exactly 5 is not listed as low stock while stock 4 and 0 are; inactive products are excluded; low-stock and invoice links open the right pages.
+
