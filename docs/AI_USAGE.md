@@ -10,3 +10,8 @@
 - **What the AI generated:** `adjust_stock(product_id, change, reason, user, reference, note)` with row locking and validation; refactored opening-stock creation to call it; `StockAdjustmentForm`; per-product stock adjustment page with last 10 adjustments; filterable, paginated stock history page; product list and navbar links; tests for add/remove/all-stock/error/filter/pagination cases.
 - **What to verify:** Add 5 stock and confirm the stock total and history row; removing more than available shows a form error and changes nothing; removing exactly all stock is allowed; reason choices are limited to Restock and Manual correction; history filters by partial name/SKU and reason.
 
+## Step: Checkout business logic (`sales` app)
+
+- **What the AI generated:** `sales/services.py` with `CheckoutError`, `calculate_discount()` (flat/percent validation, ROUND_HALF_UP, capped at subtotal) and an atomic `checkout()` that merges duplicate items, locks products in id order, validates active state and stock, uses database prices, writes invoice `INV-YYYYMMDD-<pk>`, creates snapshot `SaleItem` rows and reduces stock through `products.services.adjust_stock()`; tests for successful sales, insufficient stock and rollback, discounts, price snapshots and inactive products.
+- **What to verify:** Complete a sale and confirm stock, invoice number, totals and SALE history rows; try an oversold two-item cart and confirm nothing changed; check 7.5% of 99.99 gives 7.50; change a product price after a sale and confirm the old invoice is unchanged; inactive products are rejected.
+
