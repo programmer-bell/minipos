@@ -13,28 +13,31 @@ def _quantize_price(price):
 
 
 @transaction.atomic
-def adjust_stock(product, change, reason, *, reference="", note="", created_by=None):
+def adjust_stock(product_id, change, reason, user=None, reference="", note=""):
     """Change stock only here: lock the product and write a StockAdjustment in the same transaction."""
     if not isinstance(change, int) or isinstance(change, bool) or change == 0:
         raise ValidationError("Stock change must be a non-zero whole number.")
     if reason not in StockAdjustment.Reason.values:
         raise ValidationError("Unknown stock adjustment reason.")
 
-    locked = Product.objects.select_for_update().get(pk=product.pk)
-    new_stock = locked.stock_quantity + change
+    product = Product.objects.select_for_update().get(pk=product_id)
+    new_stock = product.stock_quantity + change
     if new_stock < 0:
-        raise ValidationError("Stock cannot go below zero.")
+        raise ValidationError(
+            f"Only {product.stock_quantity} unit(s) in stock; "
+            f"cannot remove {abs(change)}."
+        )
 
-    locked.stock_quantity = new_stock
-    locked.save(update_fields=["stock_quantity", "updated_at"])
+    product.stock_quantity = new_stock
+    product.save(update_fields=["stock_quantity", "updated_at"])
     return StockAdjustment.objects.create(
-        product=locked,
+        product=product,
         change=change,
         stock_after=new_stock,
         reason=reason,
         reference=reference,
         note=note,
-        created_by=created_by,
+        created_by=user,
     )
 
 
@@ -53,11 +56,11 @@ def create_product(
     )
     if stock_quantity > 0:
         adjust_stock(
-            product,
+            product.pk,
             stock_quantity,
             StockAdjustment.Reason.INITIAL,
+            user=created_by,
             note="Initial stock on product creation",
-            created_by=created_by,
         )
     return product
 

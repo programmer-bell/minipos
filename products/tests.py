@@ -224,7 +224,7 @@ class StockServiceTests(TestCase):
 
     def test_adjust_stock_updates_quantity_and_writes_adjustment(self):
         adjustment = services.adjust_stock(
-            self.product, -3, StockAdjustment.Reason.CORRECTION
+            self.product.pk, -3, StockAdjustment.Reason.CORRECTION
         )
 
         self.product.refresh_from_db()
@@ -235,15 +235,177 @@ class StockServiceTests(TestCase):
     def test_adjust_stock_rejects_zero_change(self):
         with self.assertRaises(ValidationError):
             services.adjust_stock(
-                self.product, 0, StockAdjustment.Reason.CORRECTION
+                self.product.pk, 0, StockAdjustment.Reason.CORRECTION
             )
 
     def test_adjust_stock_rejects_negative_result(self):
         with self.assertRaises(ValidationError):
             services.adjust_stock(
-                self.product, -11, StockAdjustment.Reason.CORRECTION
+                self.product.pk, -11, StockAdjustment.Reason.CORRECTION
             )
 
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 10)
         self.assertFalse(self.product.adjustments.exists())
+
+
+class StockAdjustmentViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="stock-tester", password="test-password-123"
+        )
+        cls.category = Category.objects.create(name="Groceries")
+        cls.product = Product.objects.create(
+            name="Basmati Rice",
+            sku="GRC-200",
+            category=cls.category,
+            barcode="",
+            price=Decimal("120.00"),
+            stock_quantity=10,
+        )
+        cls.other = Product.objects.create(
+            name="Green Tea",
+            sku="BEV-200",
+            category=cls.category,
+            barcode="",
+            price=Decimal("180.00"),
+            stock_quantity=4,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def stock_data(self, **overrides):
+        data = {
+            "operation": "add",
+            "quantity": "5",
+            "reason": StockAdjustment.Reason.RESTOCK,
+            "note": "Delivery",
+        }
+        data.update(overrides)
+        return data
+
+    def test_add_stock_updates_stock_and_records_history(self):
+        response = self.client.post(
+            reverse("products:stock", args=[self.product.pk]),
+            self.stock_data(),
+            follow=True,
+        )
+
+        self.assertContains(response, "Stock updated")
+        self.assertContains(response, "Delivery")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 15)
+
+        adjustment = self.product.adjustments.get()
+        self.assertEqual(adjustment.change, 5)
+        self.assertEqual(adjustment.stock_after, 15)
+        self.assertEqual(adjustment.reason, StockAdjustment.Reason.RESTOCK)
+        self.assertEqual(adjustment.note, "Delivery")
+        self.assertEqual(adjustment.created_by, self.user)
+
+    def test_remove_more_than_available_shows_form_error(self):
+        response = self.client.post(
+            reverse("products:stock", args=[self.product.pk]),
+            self.stock_data(operation="remove", quantity="11"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("quantity", response.context["form"].errors)
+        self.assertContains(response, "cannot remove 11")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 10)
+        self.assertFalse(self.product.adjustments.exists())
+
+    def test_remove_exactly_all_stock_is_allowed(self):
+        response = self.client.post(
+            reverse("products:stock", args=[self.product.pk]),
+            self.stock_data(
+                operation="remove",
+                quantity="10",
+                reason=StockAdjustment.Reason.CORRECTION,
+            ),
+        )
+
+        self.assertRedirects(
+            response, reverse("products:stock", args=[self.product.pk])
+        )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 0)
+
+        adjustment = self.product.adjustments.get()
+        self.assertEqual(adjustment.change, -10)
+        self.assertEqual(adjustment.stock_after, 0)
+        self.assertEqual(adjustment.reason, StockAdjustment.Reason.CORRECTION)
+
+    def test_only_restock_and_correction_are_valid_reasons(self):
+        response = self.client.post(
+            reverse("products:stock", args=[self.product.pk]),
+            self.stock_data(reason=StockAdjustment.Reason.SALE),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("reason", response.context["form"].errors)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 10)
+        self.assertFalse(self.product.adjustments.exists())
+
+    def test_stock_page_lists_only_last_10_adjustments(self):
+        for index in range(11):
+            services.adjust_stock(
+                self.product.pk,
+                1,
+                StockAdjustment.Reason.RESTOCK,
+                note=f"Restock {index}",
+            )
+
+        response = self.client.get(
+            reverse("products:stock", args=[self.product.pk])
+        )
+        adjustments = list(response.context["adjustments"])
+
+        self.assertEqual(len(adjustments), 10)
+        self.assertEqual(adjustments[0].note, "Restock 10")
+
+    def test_stock_history_filters_by_product_and_reason(self):
+        services.adjust_stock(
+            self.product.pk, 2, StockAdjustment.Reason.RESTOCK
+        )
+        services.adjust_stock(
+            self.product.pk, -1, StockAdjustment.Reason.CORRECTION
+        )
+        services.adjust_stock(
+            self.other.pk, 3, StockAdjustment.Reason.RESTOCK
+        )
+
+        response = self.client.get(
+            reverse("products:stock_history"),
+            {"q": "grc-200", "reason": StockAdjustment.Reason.CORRECTION},
+        )
+        results = list(response.context["page_obj"].object_list)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].product, self.product)
+        self.assertEqual(results[0].reason, StockAdjustment.Reason.CORRECTION)
+
+        response = self.client.get(
+            reverse("products:stock_history"), {"q": "Green"}
+        )
+        results = list(response.context["page_obj"].object_list)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].product, self.other)
+
+    def test_stock_history_paginates_at_20(self):
+        for _ in range(21):
+            services.adjust_stock(
+                self.product.pk, 1, StockAdjustment.Reason.RESTOCK
+            )
+
+        response = self.client.get(reverse("products:stock_history"))
+
+        page_obj = response.context["page_obj"]
+        self.assertEqual(len(page_obj.object_list), 20)
+        self.assertEqual(page_obj.paginator.count, 21)
+        self.assertEqual(page_obj.paginator.num_pages, 2)

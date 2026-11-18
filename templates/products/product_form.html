@@ -30,7 +30,7 @@
         <div class="mb-3">
           <label class="form-label" for="current_stock">Stock quantity</label>
           <input type="text" class="form-control" id="current_stock" value="{{ product.stock_quantity }}" disabled>
-          <div class="form-text">Stock is not editable here. Use a stock adjustment to change it (built in the next step).</div>
+          <div class="form-text">Stock is not editable here. Use the <a href="{% url 'products:stock' product.pk %}">stock adjustment page</a> to change it.</div>
         </div>
       {% endif %}
 

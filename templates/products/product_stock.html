@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Stock adjustment | MiniPOS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-0">Stock adjustment</h1>
+    <div class="text-muted">{{ product.name }} &middot; {{ product.sku }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'products:stock_history' %}">Stock history</a>
+    <a class="btn btn-outline-secondary" href="{% url 'products:list' %}">Back to products</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="text-muted small">Current stock</div>
+            <div class="display-6">{{ product.stock_quantity }}</div>
+          </div>
+          {% if product.stock_quantity < 5 %}<span class="badge bg-warning text-dark">Low stock</span>{% endif %}
+        </div>
+        <hr>
+        <dl class="row mb-0 small">
+          <dt class="col-4">Category</dt>
+          <dd class="col-8">{{ product.category.name }}</dd>
+          <dt class="col-4">Price</dt>
+          <dd class="col-8">{{ product.price }}</dd>
+          <dt class="col-4">Status</dt>
+          <dd class="col-8">{% if product.is_active %}Active{% else %}Inactive{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <form method="post" class="card card-body">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+
+      <button class="btn btn-primary" type="submit">Apply adjustment</button>
+    </form>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Last 10 adjustments</span>
+        <a class="small" href="{% url 'products:stock_history' %}?q={{ product.sku|urlencode }}">View all for this product</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th class="text-end">Change</th>
+              <th class="text-end">Stock after</th>
+              <th>Reason</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for adjustment in adjustments %}
+              <tr>
+                <td>{{ adjustment.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="text-end">
+                  <span class="badge {% if adjustment.change > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                    {% if adjustment.change > 0 %}+{% endif %}{{ adjustment.change }}
+                  </span>
+                </td>
+                <td class="text-end">{{ adjustment.stock_after }}</td>
+                <td>{{ adjustment.get_reason_display }}</td>
+                <td>{{ adjustment.note|default:"—" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="text-center text-muted py-3">No stock adjustments yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

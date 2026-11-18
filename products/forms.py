@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Category, Product
+from .models import Category, Product, StockAdjustment
 
 
 def _style_fields(fields):
@@ -68,6 +68,38 @@ class CategoryForm(forms.ModelForm):
         error_messages = {
             "name": {"unique": "A category with this name already exists."},
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _style_fields(self.fields)
+
+
+class StockAdjustmentForm(forms.Form):
+    """Validate a manual stock adjustment; the view turns it into a signed change."""
+
+    ADD = "add"
+    REMOVE = "remove"
+    OPERATION_CHOICES = [(ADD, "Add stock"), (REMOVE, "Remove stock")]
+    REASON_CHOICES = [
+        (StockAdjustment.Reason.RESTOCK, "Restock"),
+        (StockAdjustment.Reason.CORRECTION, "Manual correction"),
+    ]
+
+    operation = forms.ChoiceField(
+        choices=OPERATION_CHOICES, initial=ADD, label="Change type"
+    )
+    quantity = forms.IntegerField(min_value=1, label="Quantity")
+    reason = forms.ChoiceField(
+        choices=REASON_CHOICES,
+        initial=StockAdjustment.Reason.RESTOCK,
+        label="Reason",
+    )
+    note = forms.CharField(
+        max_length=255,
+        required=False,
+        label="Note",
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
