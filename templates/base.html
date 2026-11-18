@@ -19,9 +19,9 @@
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link" href="{% url 'dashboard:home' %}">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'sales:pos' %}">POS</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'sales:sale_list' %}">Sales</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'products:list' %}">Products</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'products:stock_history' %}">Stock history</a></li>
-        {# Sales history link gets added in a later step #}
       </ul>
       <form method="post" action="{% url 'logout' %}" class="d-flex align-items-center gap-2">
         {% csrf_token %}

@@ -20,3 +20,8 @@
 - **What the AI generated:** `/pos/` with session cart (`{product_id: quantity}` only), active-product search by name/SKU/exact barcode limited to 10 results, add/update/remove cart actions, server-rendered discount preview, `DiscountForm`, checkout through `sales.services.checkout()`, a minimal sale detail page, POS navbar link, Bootstrap error alert styling, and view tests.
 - **What to verify:** Add products and update quantities; try a quantity above stock and confirm it is blocked with a message; apply 10% and a flat discount and check the totals; complete a sale and confirm the cart clears, the invoice page opens, and stock drops; open POS in two tabs, sell the last unit in one, and confirm the other fails with a clear message instead of overselling.
 
+## Step: Sales history and printable invoices (`sales` app)
+
+- **What the AI generated:** `/sales/` with paginated newest-first sales, invoice search, inclusive date-range filter and item counts; upgraded `/sales/<id>/` using `SaleItem` snapshots with the full discount breakdown; `/sales/<id>/print/` standalone print template with `@media print` and `window.print()`; Sales navbar link; `SaleFilterForm`; query optimization with `select_related`/`prefetch_related`; tests for ordering, filters, snapshots, print output and login protection.
+- **What to verify:** Totals on the list/detail/print pages match the POS receipt; change a product's name, SKU or price after a sale and confirm the old invoice is unchanged; search by invoice and filter by a date range; print preview has no navbar and hides the Print button.
+

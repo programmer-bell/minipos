@@ -7,11 +7,14 @@
   <div>
     <h1 class="h3 mb-0">Sale {{ sale.invoice_number }}</h1>
     <p class="text-muted mb-0">
-      {{ sale.created_at }}
+      {{ sale.created_at|date:"M j, Y, H:i" }}
       {% if sale.created_by %} &middot; {{ sale.created_by.username }}{% endif %}
     </p>
   </div>
-  <a class="btn btn-primary" href="{% url 'sales:pos' %}">Back to POS</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'sales:sale_list' %}">All sales</a>
+    <a class="btn btn-outline-dark" href="{% url 'sales:sale_print' sale.pk %}" target="_blank" rel="noopener">Print invoice</a>
+  </div>
 </div>
 
 <div class="card">
@@ -36,6 +39,8 @@
               <td class="text-end">{{ item.quantity }}</td>
               <td class="text-end">{{ item.line_total }}</td>
             </tr>
+          {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-4">This sale has no items.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -44,13 +49,21 @@
     <dl class="row mb-0">
       <dt class="col-8">Subtotal</dt>
       <dd class="col-4 text-end">{{ sale.subtotal }}</dd>
-      <dt class="col-8">Discount ({{ sale.get_discount_type_display }})</dt>
+
+      <dt class="col-8">Discount type</dt>
+      <dd class="col-4 text-end">{{ sale.get_discount_type_display }}</dd>
+
+      <dt class="col-8">Discount value</dt>
+      <dd class="col-4 text-end">
+        {% if sale.discount_type == "percent" %}{{ sale.discount_value }}%{% else %}{{ sale.discount_value }}{% endif %}
+      </dd>
+
+      <dt class="col-8">Discount amount</dt>
       <dd class="col-4 text-end">{{ sale.discount_amount }}</dd>
+
       <dt class="col-8 fs-5">Total</dt>
       <dd class="col-4 text-end fs-5 fw-bold">{{ sale.total }}</dd>
     </dl>
   </div>
 </div>
-
-<p class="text-muted small mt-3">Sales history and receipts will be expanded in a later step.</p>
 {% endblock %}

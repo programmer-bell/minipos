@@ -1,7 +1,10 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -551,3 +554,204 @@ class PosViewTests(TestCase):
 
         self.assertContains(response, "The cart is empty")
         self.assertFalse(Sale.objects.exists())
+
+
+class SalesViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="sales-viewer", password="test-password-123"
+        )
+        category = Category.objects.create(name="Groceries")
+        cls.rice = Product.objects.create(
+            name="Basmati Rice",
+            sku="GRC-001",
+            category=category,
+            barcode="",
+            price=Decimal("120.00"),
+            stock_quantity=10,
+        )
+        cls.chips = Product.objects.create(
+            name="Potato Chips",
+            sku="SNK-001",
+            category=category,
+            barcode="",
+            price=Decimal("30.00"),
+            stock_quantity=5,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def make_sale(
+        self,
+        items,
+        discount_type=Sale.DiscountType.NONE,
+        discount_value=Decimal("0"),
+        created_at=None,
+    ):
+        sale = services.checkout(items, discount_type, discount_value, self.user)
+        if created_at is not None:
+            Sale.objects.filter(pk=sale.pk).update(created_at=created_at)
+            sale.refresh_from_db()
+        return sale
+
+    def test_list_shows_sales_newest_first_with_item_count(self):
+        first = self.make_sale([(self.rice.pk, 1)])
+        second = self.make_sale([(self.chips.pk, 2)])
+
+        response = self.client.get(reverse("sales:sale_list"))
+
+        self.assertEqual(response.status_code, 200)
+        sales = list(response.context["page_obj"].object_list)
+        self.assertEqual([sale.pk for sale in sales], [second.pk, first.pk])
+        self.assertEqual(sales[0].item_count, 1)
+        self.assertContains(response, first.invoice_number)
+        self.assertContains(response, second.invoice_number)
+
+    def test_list_searches_by_invoice_number(self):
+        first = self.make_sale([(self.rice.pk, 1)])
+        second = self.make_sale([(self.chips.pk, 1)])
+
+        response = self.client.get(
+            reverse("sales:sale_list"), {"q": first.invoice_number}
+        )
+
+        self.assertContains(response, first.invoice_number)
+        self.assertNotContains(response, second.invoice_number)
+
+    def test_list_filters_by_inclusive_date_range(self):
+        today = timezone.localdate()
+        old_sale = self.make_sale(
+            [(self.rice.pk, 1)],
+            created_at=timezone.now() - timedelta(days=2),
+        )
+        new_sale = self.make_sale([(self.chips.pk, 1)])
+
+        response = self.client.get(
+            reverse("sales:sale_list"),
+            {"date_from": today.isoformat(), "date_to": today.isoformat()},
+        )
+        sales = list(response.context["page_obj"].object_list)
+        self.assertEqual([sale.pk for sale in sales], [new_sale.pk])
+
+        response = self.client.get(
+            reverse("sales:sale_list"),
+            {
+                "date_from": (today - timedelta(days=3)).isoformat(),
+                "date_to": (today - timedelta(days=1)).isoformat(),
+            },
+        )
+        sales = list(response.context["page_obj"].object_list)
+        self.assertEqual([sale.pk for sale in sales], [old_sale.pk])
+
+    def test_list_rejects_reversed_date_range(self):
+        today = timezone.localdate()
+
+        response = self.client.get(
+            reverse("sales:sale_list"),
+            {
+                "date_from": today.isoformat(),
+                "date_to": (today - timedelta(days=1)).isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "From date cannot be after to date")
+
+    def test_list_paginates_at_20(self):
+        for index in range(21):
+            Sale.objects.create(
+                invoice_number=f"INV-TEST-{index:05d}",
+                subtotal=Decimal("10.00"),
+                total=Decimal("10.00"),
+                created_by=self.user,
+            )
+
+        response = self.client.get(reverse("sales:sale_list"))
+
+        page_obj = response.context["page_obj"]
+        self.assertEqual(len(page_obj.object_list), 20)
+        self.assertEqual(page_obj.paginator.count, 21)
+        self.assertEqual(page_obj.paginator.num_pages, 2)
+
+    def test_detail_uses_snapshots_after_product_changes(self):
+        sale = self.make_sale(
+            [(self.rice.pk, 2)],
+            Sale.DiscountType.PERCENT,
+            Decimal("10"),
+        )
+
+        self.rice.name = "Renamed Rice"
+        self.rice.sku = "NEW-001"
+        self.rice.price = Decimal("999.00")
+        self.rice.save(update_fields=["name", "sku", "price", "updated_at"])
+
+        response = self.client.get(
+            reverse("sales:sale_detail", args=[sale.pk])
+        )
+
+        self.assertContains(response, "Basmati Rice")
+        self.assertNotContains(response, "Renamed Rice")
+        self.assertContains(response, "GRC-001")
+        self.assertNotContains(response, "NEW-001")
+        self.assertContains(response, "120.00")
+        self.assertContains(response, "240.00")
+        self.assertContains(response, "Percentage")
+        self.assertContains(response, "10.00%")
+        self.assertContains(response, "24.00")
+        self.assertContains(response, "216.00")
+        self.assertContains(response, "sales-viewer")
+
+    def test_detail_returns_404_for_missing_sale(self):
+        response = self.client.get(
+            reverse("sales:sale_detail", args=[999999])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_detail_prefetches_items_without_n_plus_one(self):
+        sale = self.make_sale([(self.rice.pk, 1), (self.chips.pk, 1)])
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(
+                reverse("sales:sale_detail", args=[sale.pk])
+            )
+
+        self.assertEqual(response.status_code, 200)
+        item_queries = [
+            query["sql"]
+            for query in queries.captured_queries
+            if "sales_saleitem" in query["sql"].lower()
+        ]
+        self.assertEqual(len(item_queries), 1)
+
+    def test_print_page_is_standalone_and_printable(self):
+        sale = self.make_sale([(self.rice.pk, 2)])
+
+        response = self.client.get(reverse("sales:sale_print", args=[sale.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, sale.invoice_number)
+        self.assertContains(response, "Basmati Rice")
+        self.assertContains(response, "240.00")
+        self.assertContains(response, "@media print")
+        self.assertContains(response, "window.print()")
+        self.assertNotContains(response, "Dashboard")
+        self.assertNotContains(response, "navbar")
+
+    def test_sales_pages_require_login(self):
+        sale = self.make_sale([(self.rice.pk, 1)])
+        self.client.logout()
+
+        urls = [
+            reverse("sales:sale_list"),
+            reverse("sales:sale_detail", args=[sale.pk]),
+            reverse("sales:sale_print", args=[sale.pk]),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertRedirects(
+                    response, f"{reverse('login')}?next={url}"
+                )

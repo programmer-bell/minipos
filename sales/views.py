@@ -1,7 +1,8 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib import messages
-from django.db.models import Q
+from django.core.paginator import Paginator
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import urlencode
@@ -10,7 +11,7 @@ from django.views.decorators.http import require_POST
 from products.models import Product
 
 from . import services
-from .forms import DiscountForm
+from .forms import DiscountForm, SaleFilterForm
 from .models import Sale
 
 CART_SESSION_KEY = "pos_cart"
@@ -276,8 +277,49 @@ def pos_checkout(request):
     return redirect("sales:sale_detail", pk=sale.pk)
 
 
-def sale_detail(request, pk):
-    sale = get_object_or_404(
-        Sale.objects.select_related("created_by").prefetch_related("items"), pk=pk
+def _sale_detail_queryset():
+    """Load one sale with its cashier and snapshot items in two queries."""
+    return Sale.objects.select_related("created_by").prefetch_related("items")
+
+
+def sale_list(request):
+    form = SaleFilterForm(request.GET)
+    sales = (
+        Sale.objects.select_related("created_by")
+        .annotate(item_count=Count("items"))
+        .order_by("-created_at", "-id")
     )
+
+    if form.is_valid():
+        query = form.cleaned_data["q"].strip()
+        date_from = form.cleaned_data["date_from"]
+        date_to = form.cleaned_data["date_to"]
+        if query:
+            sales = sales.filter(invoice_number__icontains=query)
+        if date_from:
+            sales = sales.filter(created_at__date__gte=date_from)
+        if date_to:
+            sales = sales.filter(created_at__date__lte=date_to)
+
+    page_obj = Paginator(sales, 20).get_page(request.GET.get("page"))
+    filters = request.GET.copy()
+    filters.pop("page", None)
+    return render(
+        request,
+        "sales/sale_list.html",
+        {
+            "form": form,
+            "page_obj": page_obj,
+            "querystring": filters.urlencode(),
+        },
+    )
+
+
+def sale_detail(request, pk):
+    sale = get_object_or_404(_sale_detail_queryset(), pk=pk)
     return render(request, "sales/sale_detail.html", {"sale": sale})
+
+
+def sale_print(request, pk):
+    sale = get_object_or_404(_sale_detail_queryset(), pk=pk)
+    return render(request, "sales/sale_print.html", {"sale": sale})
