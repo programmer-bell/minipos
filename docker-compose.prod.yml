@@ -1,0 +1,89 @@
+# docker-compose.prod.yml - Production deployment (e.g., Render, VPS, etc.)
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: minipos:latest
+    container_name: minipos-web
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - DATABASE_URL=${DATABASE_URL}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      - RENDER_EXTERNAL_HOSTNAME=${RENDER_EXTERNAL_HOSTNAME}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # Health check for container orchestration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    # Resource limits (adjust based on your infrastructure)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Run migrations as a separate one-off service
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: minipos:latest
+    container_name: minipos-migrate
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - DATABASE_URL=${DATABASE_URL}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      - RENDER_EXTERNAL_HOSTNAME=${RENDER_EXTERNAL_HOSTNAME}
+    command: python manage.py migrate --noinput
+    depends_on:
+      - web
+    restart: "no"
+    profiles:
+      - migration
+
+  # Optional: Seed database
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: minipos:latest
+    container_name: minipos-seed
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - DATABASE_URL=${DATABASE_URL}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      - RENDER_EXTERNAL_HOSTNAME=${RENDER_EXTERNAL_HOSTNAME}
+      - DEMO_USERNAME=${DEMO_USERNAME:-demo}
+      - DEMO_PASSWORD=${DEMO_PASSWORD}
+    command: python manage.py seed
+    depends_on:
+      - migrate
+    restart: "no"
+    profiles:
+      - seed

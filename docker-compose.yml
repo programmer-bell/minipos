@@ -1,0 +1,95 @@
+# docker-compose.yml - Local development and testing with Docker
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: minipos-db
+    environment:
+      POSTGRES_DB: minipos
+      POSTGRES_USER: minipos
+      POSTGRES_PASSWORD: minipos_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U minipos -d minipos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching (optional, for future use)
+  redis:
+    image: redis:7-alpine
+    container_name: minipos-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Main application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: minipos-web
+    environment:
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DEBUG=True
+      - DATABASE_URL=postgresql://minipos:minipos_password@db:5432/minipos
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - CSRF_TRUSTED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+      - DEMO_USERNAME=demo
+      - DEMO_PASSWORD=demo12345
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount source code for development (remove in production)
+      - ./templates:/app/templates:ro
+      - ./products:/app/products:ro
+      - ./sales:/app/sales:ro
+      - ./dashboard:/app/dashboard:ro
+      - ./config:/app/config:ro
+      - ./manage.py:/app/manage.py:ro
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py seed &&
+             gunicorn --bind 0.0.0.0:8000 --workers 1 --threads 2 --reload config.wsgi:application"
+
+  # Production-like service (uses built image without volume mounts)
+  web-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: minipos-web-prod
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DEBUG=False
+      - DATABASE_URL=${DATABASE_URL}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      - RENDER_EXTERNAL_HOSTNAME=${RENDER_EXTERNAL_HOSTNAME}
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # No volume mounts - uses baked image
+
+volumes:
+  postgres_data:
+  redis_data:

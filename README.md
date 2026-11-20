@@ -27,6 +27,34 @@ MiniPOS is a small, server-rendered point-of-sale application built for the Mini
 
 ## Local setup
 
+### Option 1: Using Docker (recommended for consistent environments)
+
+```bash
+git clone https://github.com/programmer-bell/minipos.git
+cd minipos
+cp .env.example .env
+# Edit .env with your SECRET_KEY and DATABASE_URL (use postgresql://postgres:postgres@db:5432/minipos for Docker)
+docker compose up --build
+```
+
+The application will be available at http://localhost:8000/. The compose file starts PostgreSQL, Redis, and the web service with hot-reload for development.
+
+To run in production mode (no volume mounts, optimized settings):
+
+```bash
+docker compose -f docker-compose.prod.yml up --build
+```
+
+Set required environment variables in `.env` or export them:
+- `SECRET_KEY` - Django secret key
+- `DATABASE_URL` - PostgreSQL connection string
+- `ALLOWED_HOSTS` - Comma-separated hostnames
+- `CSRF_TRUSTED_ORIGINS` - Comma-separated trusted origins
+- `RENDER_EXTERNAL_HOSTNAME` - Optional Render hostname
+- `DEMO_USERNAME` / `DEMO_PASSWORD` - Demo credentials for seeding
+
+### Option 2: Using uv (native Python)
+
 Install `uv`, make sure a PostgreSQL database is available, then run:
 
 ```bash
