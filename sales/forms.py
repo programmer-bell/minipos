@@ -4,6 +4,7 @@ from django import forms
 
 from .models import Sale
 
+from django.utils.timezone import localdate
 
 class DiscountForm(forms.Form):
     """Validate POS discount fields before previewing or completing a sale."""
@@ -61,9 +62,12 @@ class SaleFilterForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        date_from = cleaned_data.get("date_from")
+        date_from = cleaned_data.get("date_from") 
+        if date_from >= localdate():
+            self.add_error("date_from", "From date cannot be after to date.")
+        else:
+            pass
         date_to = cleaned_data.get("date_to")
         if date_from and date_to and date_from > date_to:
             self.add_error("date_to", "From date cannot be after to date.")
         return cleaned_data
-
